@@ -116,11 +116,20 @@
       "settings": {
         "include_margins": true
       }
+    },
+    "sanity_blog_DEhdUK": {
+      "type": "sanity-blog",
+      "name": "Sanity Blog",
+      "settings": {
+        "title": "Latest from Our Blog",
+        "project_id": "nxd81dkr"
+      }
     }
   },
   "order": [
     "image_banner",
     "featured_collection",
-    "1761908279b410d75f"
+    "1761908279b410d75f",
+    "sanity_blog_DEhdUK"
   ]
 }
