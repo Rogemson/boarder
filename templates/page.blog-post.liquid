@@ -1,0 +1,416 @@
+{% comment %}
+  Individual Blog Post Template
+  Displays a single blog post from Sanity CMS
+{% endcomment %}
+
+<div class="blog-post-page">
+  <div id="blog-post-content" class="loading-container">
+    <p class="loading-text">Loading post...</p>
+  </div>
+</div>
+
+<script>
+  // Get slug from URL
+  const urlParts = window.location.pathname.split('/');
+  const slug = urlParts[urlParts.length - 1];
+  
+  const SANITY_PROJECT_ID = '{{ settings.sanity_project_id }}';
+  const SANITY_DATASET = 'production';
+
+  if (!SANITY_PROJECT_ID) {
+    document.getElementById('blog-post-content').innerHTML = 
+      '<div class="container"><p class="error-message">Blog configuration error</p></div>';
+  } else if (!slug) {
+    document.getElementById('blog-post-content').innerHTML = 
+      '<div class="container"><p class="error-message">Post not found</p></div>';
+  } else {
+    // Fetch single post by slug
+    const query = `*[_type == "post" && slug.current == "${slug}"][0] {
+      title,
+      "slug": slug.current,
+      excerpt,
+      publishedAt,
+      body,
+      "image": mainImage.asset->url,
+      "imageAlt": mainImage.alt,
+      "authorName": author->name,
+      "authorImage": author->image.asset->url,
+      "authorBio": author->bio,
+      "categories": categories[]->title
+    }`;
+
+    const url = `https://${SANITY_PROJECT_ID}.api.sanity.io/v2021-10-21/data/query/${SANITY_DATASET}?query=${encodeURIComponent(query)}`;
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const post = data.result;
+        const container = document.getElementById('blog-post-content');
+        
+        if (!post) {
+          container.innerHTML = `
+            <div class="container">
+              <div class="post-not-found">
+                <h1>Post Not Found</h1>
+                <p>The blog post you're looking for doesn't exist.</p>
+                <a href="/pages/blog" class="btn btn--primary">Back to Blog</a>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        const date = new Date(post.publishedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        // Convert Sanity block content to HTML (simplified)
+        let bodyHtml = '';
+        if (post.body && Array.isArray(post.body)) {
+          bodyHtml = post.body.map(block => {
+            if (block._type === 'block') {
+              const text = block.children.map(child => child.text).join('');
+              const style = block.style || 'normal';
+              
+              if (style === 'h2') return `<h2>${text}</h2>`;
+              if (style === 'h3') return `<h3>${text}</h3>`;
+              if (style === 'h4') return `<h4>${text}</h4>`;
+              return `<p>${text}</p>`;
+            }
+            return '';
+          }).join('');
+        }
+
+        container.innerHTML = `
+          <article class="blog-post">
+            <!-- Header -->
+            <header class="post-header">
+              <div class="container">
+                <a href="/pages/blog" class="back-link">← Back to Blog</a>
+                
+                ${post.categories && post.categories.length > 0 ? `
+                  <div class="post-categories">
+                    ${post.categories.map(cat => `<span class="post-category">${cat}</span>`).join('')}
+                  </div>
+                ` : ''}
+                
+                <h1 class="post-title">${post.title}</h1>
+                
+                <div class="post-meta">
+                  <span class="post-date">${date}</span>
+                  ${post.authorName ? `<span class="post-author">by ${post.authorName}</span>` : ''}
+                </div>
+              </div>
+            </header>
+
+            <!-- Featured Image -->
+            ${post.image ? `
+              <div class="post-featured-image">
+                <img src="${post.image}?w=1400&h=700&fit=crop&auto=format" 
+                     alt="${post.imageAlt || post.title}" 
+                     loading="eager">
+              </div>
+            ` : ''}
+
+            <!-- Content -->
+            <div class="post-content">
+              <div class="container container--narrow">
+                ${post.excerpt ? `
+                  <p class="post-excerpt">${post.excerpt}</p>
+                ` : ''}
+                
+                <div class="post-body">
+                  ${bodyHtml || '<p>Content coming soon...</p>'}
+                </div>
+              </div>
+            </div>
+
+            <!-- Author Bio -->
+            ${post.authorName ? `
+              <div class="post-author-section">
+                <div class="container container--narrow">
+                  <div class="author-card">
+                    ${post.authorImage ? `
+                      <img src="${post.authorImage}?w=100&h=100&fit=crop" 
+                           alt="${post.authorName}" 
+                           class="author-avatar">
+                    ` : `
+                      <div class="author-avatar-placeholder">
+                        ${post.authorName.charAt(0)}
+                      </div>
+                    `}
+                    <div class="author-info">
+                      <h3 class="author-name">${post.authorName}</h3>
+                      ${post.authorBio ? `<p class="author-bio">${post.authorBio}</p>` : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Footer -->
+            <footer class="post-footer">
+              <div class="container">
+                <a href="/pages/blog" class="btn btn--secondary">← Back to All Posts</a>
+              </div>
+            </footer>
+          </article>
+        `;
+      })
+      .catch(err => {
+        console.error('Error fetching post:', err);
+        document.getElementById('blog-post-content').innerHTML = `
+          <div class="container">
+            <div class="error-message">
+              <h1>Error Loading Post</h1>
+              <p>Unable to load the blog post. Please try again later.</p>
+              <a href="/pages/blog" class="btn btn--primary">Back to Blog</a>
+            </div>
+          </div>
+        `;
+      });
+  }
+</script>
+
+<style>
+  /* Loading State */
+  .loading-container {
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-text {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+  }
+
+  /* Container */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--space-16);
+  }
+
+  .container--narrow {
+    max-width: 800px;
+  }
+
+  /* Back Link */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4);
+    color: var(--color-primary);
+    text-decoration: none;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--space-16);
+    transition: gap var(--duration-fast) var(--ease-standard);
+  }
+
+  .back-link:hover {
+    gap: var(--space-8);
+  }
+
+  /* Post Header */
+  .post-header {
+    padding: var(--space-32) 0;
+    background-color: var(--color-background);
+  }
+
+  .post-categories {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-16);
+  }
+
+  .post-category {
+    display: inline-block;
+    padding: var(--space-4) var(--space-12);
+    background: var(--color-primary);
+    color: var(--color-btn-primary-text);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-sm);
+  }
+
+  .post-title {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
+    margin: 0 0 var(--space-16) 0;
+    color: var(--color-text);
+  }
+
+  .post-meta {
+    display: flex;
+    gap: var(--space-16);
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+  }
+
+  .post-date::before {
+    content: "📅 ";
+  }
+
+  .post-author::before {
+    content: "✍️ ";
+  }
+
+  /* Featured Image */
+  .post-featured-image {
+    width: 100%;
+    max-height: 600px;
+    overflow: hidden;
+    background: var(--color-secondary);
+  }
+
+  .post-featured-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Post Content */
+  .post-content {
+    padding: var(--space-32) 0;
+    background-color: var(--color-surface);
+  }
+
+  .post-excerpt {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-normal);
+    color: var(--color-text-secondary);
+    font-style: italic;
+    margin-bottom: var(--space-32);
+    padding-bottom: var(--space-32);
+    border-bottom: 2px solid var(--color-border);
+  }
+
+  .post-body {
+    font-size: var(--font-size-lg);
+    line-height: 1.8;
+    color: var(--color-text);
+  }
+
+  .post-body h2 {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    margin: var(--space-32) 0 var(--space-16) 0;
+    color: var(--color-text);
+  }
+
+  .post-body h3 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    margin: var(--space-24) 0 var(--space-12) 0;
+    color: var(--color-text);
+  }
+
+  .post-body p {
+    margin-bottom: var(--space-20);
+  }
+
+  /* Author Section */
+  .post-author-section {
+    padding: var(--space-32) 0;
+    background-color: var(--color-background);
+  }
+
+  .author-card {
+    display: flex;
+    gap: var(--space-20);
+    align-items: center;
+    padding: var(--space-24);
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-card-border);
+  }
+
+  .author-avatar,
+  .author-avatar-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .author-avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    color: var(--color-btn-primary-text);
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .author-name {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 var(--space-8) 0;
+    color: var(--color-text);
+  }
+
+  .author-bio {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: var(--line-height-normal);
+  }
+
+  /* Post Footer */
+  .post-footer {
+    padding: var(--space-32) 0;
+    text-align: center;
+  }
+
+  /* Error States */
+  .post-not-found,
+  .error-message {
+    text-align: center;
+    padding: var(--space-32);
+  }
+
+  .post-not-found h1,
+  .error-message h1 {
+    font-size: var(--font-size-3xl);
+    margin-bottom: var(--space-16);
+    color: var(--color-text);
+  }
+
+  .post-not-found p,
+  .error-message p {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-24);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .post-header {
+      padding: var(--space-24) 0;
+    }
+
+    .post-title {
+      font-size: 28px;
+    }
+
+    .post-meta {
+      flex-direction: column;
+      gap: var(--space-8);
+    }
+
+    .author-card {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+</style>

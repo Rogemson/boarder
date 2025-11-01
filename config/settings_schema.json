@@ -1451,5 +1451,16 @@
         "default": "scheme-1"
       }
     ]
-  }
+  },
+  {
+    "name": "Sanity CMS",
+    "settings": [
+      {
+        "type": "text",
+        "id": "sanity_project_id",
+        "label": "Sanity Project ID",
+        "info": "Your Sanity project ID for blog integration"
+      }
+    ]
+  },
 ]
